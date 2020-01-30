@@ -1,0 +1,35 @@
+{
+  "name": "gphotos-sync",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsc && node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Ben Ritz",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@types/server-destroy": "^1.0.0",
+    "aws-sdk": "^2.598.0",
+    "google-auth-library": "^5.9.2",
+    "http": "0.0.0",
+    "open": "^7.0.1",
+    "rxjs": "^6.5.4",
+    "server-destroy": "^1.0.1",
+    "xmlhttprequest": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^13.1.4",
+    "@typescript-eslint/eslint-plugin": "^2.15.0",
+    "@typescript-eslint/parser": "^2.15.0",
+    "eslint": "^6.8.0",
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.19.1",
+    "eslint-plugin-node": "^11.0.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
+    "typescript": "^3.7.4"
+  }
+}

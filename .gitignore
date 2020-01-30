@@ -102,3 +102,7 @@ dist
 
 # TernJS port file
 .tern-port
+credentials.json
+src/.DS_Store
+tokens.json
+.DS_Store
