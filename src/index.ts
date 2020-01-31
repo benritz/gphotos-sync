@@ -1,10 +1,9 @@
 import S3 from 'aws-sdk/clients/s3'
 import DynamoDB from 'aws-sdk/clients/dynamodb'
 import fs from 'fs'
-import {Observable, Subject} from 'rxjs'
-import {} from 'rxjs/operators'
-import {ajax} from "rxjs/ajax";
-import {OAuth2Client, TokenInfo} from 'google-auth-library';
+import {Observable, from, EMPTY} from 'rxjs'
+import {expand, map, mergeMap} from 'rxjs/operators'
+import {OAuth2Client} from 'google-auth-library';
 import http from 'http';
 import url from 'url';
 import open from 'open';
@@ -14,8 +13,8 @@ const SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly'];
 
 const credentials = JSON.parse(fs.readFileSync('credentials.json').toString('utf8'));
 
-function getAuthenticatedClient(scopes: string[]): Promise<OAuth2Client> {
-    return new Promise((resolve, reject) => {
+function getAuthenticatedClient(scopes: string[]): Observable<OAuth2Client> {
+    return new Observable((subscriber) => {
         const client = new OAuth2Client(
             credentials.web.client_id,
             credentials.web.client_secret,
@@ -26,7 +25,7 @@ function getAuthenticatedClient(scopes: string[]): Promise<OAuth2Client> {
         try {
             client.setCredentials(JSON.parse(fs.readFileSync('tokens.json').toString('utf8')));
 
-            resolve(client);
+            subscriber.next(client);
             return;
         } catch (err) {
             // ignore
@@ -50,12 +49,12 @@ function getAuthenticatedClient(scopes: string[]): Promise<OAuth2Client> {
                             fs.writeFileSync('tokens.json', JSON.stringify(tokenResponse.tokens));
 
                             client.setCredentials(tokenResponse.tokens);
-                            resolve(client);
+                            subscriber.next(client);
                         })
-                        .catch((err) => reject(err));
+                        .catch((err) => subscriber.error(err));
                 }
             } catch (e) {
-                reject(e);
+                subscriber.error(e);
             }
         })
         .listen(8888, () => {
@@ -67,31 +66,39 @@ function getAuthenticatedClient(scopes: string[]): Promise<OAuth2Client> {
 }
 
 function main(): Observable<object> {
-    const pages$ = new Subject<{}>();
+    const getMediaItems = (client: OAuth2Client, pageToken?: string): Observable<{}> => {
+        let url = 'https://photoslibrary.googleapis.com/v1/mediaItems?pageSize=100';
+        if (pageToken) {
+            url += `&pageToken=${pageToken}`;
+        }
 
-    getAuthenticatedClient(SCOPES).then((client) => {
+        return from(client.request<object>({url})).pipe(
+            map((resp) => {
+                const data = resp.data;
 
-        const getMediaItems = (client: OAuth2Client, pageToken?: string): void => {
-            let url = 'https://photoslibrary.googleapis.com/v1/mediaItems?pageSize=100';
-            if (pageToken) {
-                url += `&pageToken=${pageToken}`;
-            }
+                if (pageToken) {
+                    data['pageToken'] = pageToken;
+                }
 
-            console.log(url);
+                return data;
+            })
+        );
+    };
 
-            client.request<object>({url})
-                .then((resp) => {
-                    pages$.next(resp.data);
-                    getMediaItems(client, resp.data['nextPageToken']);
-                });
-        };
-
-        getMediaItems(client);
-    });
-
-    return pages$;
+    return getAuthenticatedClient(SCOPES).pipe(
+        mergeMap((client) =>
+            getMediaItems(client).pipe(
+                expand((data) => data['nextPageToken'] ? getMediaItems(client, data['nextPageToken']) : EMPTY)
+            )
+        )
+    );
 }
 
+let total = 0;
+
 main().subscribe({ next: (page) => {
-    console.log(page['mediaItems'].length);
+        const count = page['mediaItems'].length;
+        total += count;
+        console.log(`${page['pageToken']} ${count}`);
+        console.log(`Total: ${total}`);
 }, error: (err) => { console.error(err); }});
