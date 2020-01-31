@@ -102,7 +102,13 @@ dist
 
 # TernJS port file
 .tern-port
+
+# macOs os files
+*.DS_Store
+
+# IDE files
+.idea/
+
+# temporary credentials
 credentials.json
-src/.DS_Store
 tokens.json
-.DS_Store
