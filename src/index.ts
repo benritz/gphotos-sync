@@ -5,6 +5,7 @@ import {Observable, from, EMPTY} from 'rxjs'
 import {expand, map, mergeMap, take} from 'rxjs/operators'
 import {OAuth2Client} from 'google-auth-library';
 import http from 'http';
+import https from 'https'
 import url from 'url';
 import open from 'open';
 import enableDestroy from 'server-destroy';
@@ -95,7 +96,7 @@ function getAuthenticatedClient(scopes: string[]): Observable<OAuth2Client> {
     });
 }
 
-function getMediaItems(): Observable<MediaItemsResult> {
+const getMediaItems = (): Observable<MediaItemsResult> => {
     const getPage = (client: OAuth2Client, pageToken?: string): Observable<MediaItemsResult> => {
         let url = 'https://photoslibrary.googleapis.com/v1/mediaItems?pageSize=100';
         if (pageToken) {
@@ -122,23 +123,38 @@ function getMediaItems(): Observable<MediaItemsResult> {
             )
         )
     );
-}
+};
+
+var urlToFile = (url: string, dest: string): Observable<void> =>
+    new Observable(subscriber => {
+        var file = fs.createWriteStream(dest);
+        var request = https.get(url, function(response) {
+            response.pipe(file);
+            file.on('finish', function() {
+                file.close();
+                subscriber.next();
+            });
+        }).on('error', function(err) { // Handle errors
+            fs.unlink(dest, () => {}); // Delete the file async. (But we don't check the result)
+            subscriber.error(err);
+        });
+    });
+
 
 let total = 0;
 
 getMediaItems().pipe(
-    take(1)
-).subscribe({ next: (result) => {
-        result.mediaItems.forEach((mediaItem) => {
-            console.log(mediaItem.productUrl);
-            console.log(mediaItem.baseUrl);
-        });
-        // const count = page['mediaItems'].length;
-        // total += count;
-        // console.log(`${page['pageToken']} ${count}`);
-        // console.log(`Total: ${total}`);
+    take(1),
+    mergeMap((result) => {
+        return from(result.mediaItems.map((mediaItem) => {
+            return urlToFile(`${mediaItem.baseUrl}=d`, mediaItem.mediaMetadata.creationTime + '.jpg');
+        })).pipe(mergeMap(x => x))
+    })
+).subscribe({ next: (x) => {
+    console.log(x);
+        // result.mediaItems.forEach((mediaItem) => {
+        //     console.log(mediaItem.productUrl);
+        //     console.log(mediaItem.baseUrl);
+        //     console.log(mediaItem.mediaMetadata.creationTime);
+        // });
 }, error: (err) => { console.error(err); }});
-
-
-// https://photos.google.com/lr/photo/APznxHMWSBBPr4R6-aW-2Kgy2kcjguh8Yt_TaJAnzMXBlAauhuK5VIYn02LqaExTNoL65SzNQud3AUy1O4LPHSfAaINg6zNruQ
-// https://lh3.googleusercontent.com/nhplhn6n2579Ed1wHeSWaRwxvZj-iIynNGJyqgSwVxyP-fswNjcsSf7bZJ1vh5PPy5oTqYvZA6D3hRJ8UH5cPn2PmRuvmXpQLynRAYPyrtA177uthVPQ9PRp0jLxzotAFqntf384aIlCXLF_udG793x0ywvNTC6kNIu_FYV_sJ6QT3msJ1AWw4SUnk7fuGPHvR4Pd0Y5K1lMVry2GLObQMnCF0KrObeRIvtm5d1bDOBxr10nxhF8hOaCIZkPW7pHYJoOKXXmzsp4Jzz29vF32sgLO1Qc7CkNSVui8IUEfEZJk4VtoK5bu2Uy3bNZIjQbUqFoo7HN9qRUAo21c9sOZTcoxBFFpL_dUNBfl_Px9H0-DN3JSe9UHeIyn8w7pJIvxav4yyrJPLB99ve5MGQaTc0QjgcXcoCLOq1-LCoDJeyJox7Sd-LLU3tiApWLy9sBQcCdGhSJ8618KFRoQt3T2KQvzQogfkJh_drv_Rnr4-6RIqURebNYkCm80-sqs95vWGv-QGnYs378K0il1HRM-IJgGtZEzcexHphlUxOt8ftqAQX4e3rFxK8FsX2MNYV72eMgQ3UMMTuubQq3XkzXuES_5Q3mQHQPmwTARsR01TSEYACkoK3tGYHFC-nTe-lKf05_Io_Wca3923MsQG5SDQ2VHd9GhEt_I4-wxC1gHbFX8nbhDHWju6O1jEdDI_cgLH3mT-diBQ
