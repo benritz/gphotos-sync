@@ -15,7 +15,7 @@
     "aws-sdk": "^2.598.0",
     "google-auth-library": "^7.0.4",
     "http": "0.0.0",
-    "minimist": "^1.2.5",
+    "minimist": "^1.2.6",
     "open": "^7.0.1",
     "rxjs": "^6.5.4",
     "server-destroy": "^1.0.1",
